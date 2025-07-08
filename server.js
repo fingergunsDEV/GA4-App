@@ -110,5 +110,48 @@ app.get('/api/data/scorecards', isAuthenticated, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Add this new endpoint to your server.js
+
+app.get('/api/data/locations', isAuthenticated, async (req, res) => {
+    const { startDate = '28daysAgo', endDate = 'today' } = req.query;
+    const analyticsData = google.analyticsdata({ version: 'v1beta', auth: oauth2Client });
+
+    try {
+        const response = await analyticsData.properties.runReport({
+            property: `properties/${process.env.GA4_PROPERTY_ID}`,
+            dateRanges: [{ startDate, endDate }],
+            dimensions: [{ name: 'country' }],
+            metrics: [{ name: 'activeUsers' }],
+            orderBys: [{ metric: { orderType: 'NUMERIC', metricName: 'activeUsers' }, desc: true }],
+            limit: 10 // Get top 10 countries
+        });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Location data:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add this new endpoint to your server.js
+
+app.get('/api/data/events', isAuthenticated, async (req, res) => {
+    const { startDate = '28daysAgo', endDate = 'today' } = req.query;
+    const analyticsData = google.analyticsdata({ version: 'v1beta', auth: oauth2Client });
+
+    try {
+        const response = await analyticsData.properties.runReport({
+            property: `properties/${process.env.GA4_PROPERTY_ID}`,
+            dateRanges: [{ startDate, endDate }],
+            dimensions: [{ name: 'eventName' }],
+            metrics: [{ name: 'eventCount' }],
+            orderBys: [{ metric: { orderType: 'NUMERIC', metricName: 'eventCount' }, desc: true }],
+            limit: 10 // Get top 10 events
+        });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Event data:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.listen(5000, () => console.log('Server running on http://localhost:5000'));
