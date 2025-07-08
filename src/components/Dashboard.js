@@ -1,32 +1,46 @@
 // src/components/Dashboard.js
+// --- IMPORTS ---
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import './Dashboard.css'; // For styling
+import Scorecard from './Scorecard'; // Import Scorecard
+import DataTable from './DataTable';   // Import DataTable
+import './Dashboard.css'; 
 
-// Configure axios to send credentials (cookies) with each request
+// --- AXIOS INSTANCE (no change) ---
 const api = axios.create({
     baseURL: 'http://localhost:5000/api',
     withCredentials: true,
 });
 
 const Dashboard = () => {
+    // --- STATE ---
+    // Existing state
     const [overviewData, setOverviewData] = useState([]);
     const [trafficData, setTrafficData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // New state for the new metrics
+    const [scorecardData, setScorecardData] = useState(null);
+    const [locationData, setLocationData] = useState([]);
+    const [eventData, setEventData] = useState([]);
+
+    // --- USE EFFECT (updated) ---
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                // Fetch data in parallel
-                const [overviewRes, trafficRes] = await Promise.all([
+                const [overviewRes, trafficRes, scorecardRes, locationRes, eventRes] = await Promise.all([
                     api.get('/data/overview'),
-                    api.get('/data/traffic')
+                    api.get('/data/traffic'),
+                    api.get('/data/scorecards'),
+                    api.get('/data/locations'),
+                    api.get('/data/events'),
                 ]);
 
-                // Process overview data for the line chart
+                // --- DATA PROCESSING ---
+                // Overview (no change)
                 const formattedOverview = overviewRes.data.rows.map(row => ({
                     date: `${row.dimensionValues[0].value.slice(4, 6)}/${row.dimensionValues[0].value.slice(6, 8)}`,
                     Users: parseInt(row.metricValues[0].value, 10),
@@ -34,12 +48,34 @@ const Dashboard = () => {
                 }));
                 setOverviewData(formattedOverview);
 
-                // Process traffic data for the pie chart
+                // Traffic (no change)
                 const formattedTraffic = trafficRes.data.rows.map(row => ({
                     name: row.dimensionValues[0].value,
                     value: parseInt(row.metricValues[0].value, 10),
                 }));
                 setTrafficData(formattedTraffic);
+
+                // **NEW** Scorecard data processing
+                const scorecardRow = scorecardRes.data.rows[0];
+                setScorecardData({
+                    users: scorecardRow.metricValues[0].value,
+                    engagementRate: scorecardRow.metricValues[1].value,
+                    conversions: scorecardRow.metricValues[2].value,
+                });
+                
+                // **NEW** Location data processing
+                const formattedLocations = locationRes.data.rows.map(row => [
+                    row.dimensionValues[0].value, // Country
+                    parseInt(row.metricValues[0].value, 10).toLocaleString(), // Users
+                ]);
+                setLocationData(formattedLocations);
+
+                // **NEW** Event data processing
+                const formattedEvents = eventRes.data.rows.map(row => [
+                    row.dimensionValues[0].value, // Event Name
+                    parseInt(row.metricValues[0].value, 10).toLocaleString(), // Event Count
+                ]);
+                setEventData(formattedEvents);
                 
             } catch (err) {
                 console.error("Error fetching data:", err);
@@ -57,9 +93,20 @@ const Dashboard = () => {
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF'];
 
+    // --- RENDER (updated) ---
     return (
         <div className="dashboard">
             <h1>Your Google Analytics Dashboard</h1>
+            
+            {/* NEW Scorecard Section */}
+            {scorecardData && (
+                <div className="scorecard-row">
+                    <Scorecard title="Total Users" value={scorecardData.users} />
+                    <Scorecard title="Engagement Rate" value={scorecardData.engagementRate} format="percent" />
+                    <Scorecard title="Conversions" value={scorecardData.conversions} />
+                </div>
+            )}
+
             <div className="grid-container">
                 <div className="chart-card">
                     <h3>Users and Sessions Over Time</h3>
@@ -89,7 +136,10 @@ const Dashboard = () => {
                         </PieChart>
                     </ResponsiveContainer>
                 </div>
-                {/* Add more chart cards here for other data points */}
+                
+                {/* NEW Data Tables */}
+                <DataTable title="Top Locations by Users" headers={["Country", "Users"]} rows={locationData} />
+                <DataTable title="Top Events" headers={["Event Name", "Count"]} rows={eventData} />
             </div>
         </div>
     );
