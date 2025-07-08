@@ -87,6 +87,28 @@ app.get('/api/data/traffic', isAuthenticated, async (req, res) => {
         res.status(500).json({ error: error.message });
     }
 });
+// Add this new endpoint to your server.js
 
+app.get('/api/data/scorecards', isAuthenticated, async (req, res) => {
+    const { startDate = '28daysAgo', endDate = 'today' } = req.query;
+    const analyticsData = google.analyticsdata({ version: 'v1beta', auth: oauth2Client });
+
+    try {
+        const response = await analyticsData.properties.runReport({
+            property: `properties/${process.env.GA4_PROPERTY_ID}`,
+            dateRanges: [{ startDate, endDate }],
+            // We fetch metrics without dimensions for a site-wide total
+            metrics: [
+                { name: 'activeUsers' },
+                { name: 'engagementRate' },
+                { name: 'conversions' }
+            ],
+        });
+        res.json(response.data);
+    } catch (error) {
+        console.error('Error fetching Scorecard data:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
 
 app.listen(5000, () => console.log('Server running on http://localhost:5000'));
